@@ -69,21 +69,6 @@ export const STATE_PRIORITY: Record<PetState, number> = {
   sleep: 0,
 };
 
-// ─── 图片文件名映射 ───
-
-export function getStateImage(state: PetState): string {
-  // 首先尝试精确匹配的文件名
-  const candidates = [
-    `/character/${state}.png`,
-    `/character/${state}.gif`,
-    `/character/${state}.webp`,
-    `/character/${state}.jpg`,
-    `/character/idle.png`,
-  ];
-  // main.ts 中的 findAsset 会处理查找逻辑
-  return candidates[0];
-}
-
 // ─── 互动日志 ───
 
 export interface Interaction {

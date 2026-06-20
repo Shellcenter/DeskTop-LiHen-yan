@@ -31,14 +31,9 @@ D:\桌面\Desktop-pet\
 │       └── default.json    # 权限声明
 │
 ├── public/
-│   └── character/          # ★ 角色图片存放目录 ★
-│       ├── idle.png        # 待机（默认显示）
-│       ├── wave.png        # 打招呼
-│       ├── happy.png       # 开心
-│       ├── think.png       # 思考
-│       ├── typing.png      # 打字
-│       ├── working.png     # 工作中
-│       └── sleep.png       # 睡觉
+│   └── models/
+│       └── lihenyan/
+│           └── full.png    # 第一阶段整图模型主体
 │
 ├── scripts/                # 辅助脚本
 │   ├── launch-silent.vbs   # VBS 静默启动（无控制台窗口）
@@ -48,22 +43,20 @@ D:\桌面\Desktop-pet\
 ├── dist/                   # 构建产物（Vite 打包输出）
 │   ├── index.html
 │   ├── assets/
-│   └── character/          # 构建后复制的角色图片
+│   └── models/             # 构建后复制的角色模型资源
 │
 └── 启动桌宠.bat            # 一键启动批处理
 ```
 
-## 7 种角色状态
+## 桌宠模型状态
 
-| 状态名 | 文件名 | 描述 | 触发条件 |
-|--------|--------|------|----------|
-| idle | idle.png | 待机/默认 | 无操作 |
-| wave | wave.png | 挥手打招呼 | 右键菜单"打招呼"/启动问候 |
-| happy | happy.png | 开心跳跃 | 单击宠物 |
-| think | think.png | 歪头思考 | 空闲循环随机切换 |
-| typing | typing.png | 打字 | 空闲循环随机切换 |
-| working | working.png | 专注工作 | Claude Code 进程检测到 |
-| sleep | sleep.png | 闭眼睡觉 | 空闲循环随机切换/退出时 |
+第一阶段已经从“多张状态图切换”改为“单角色模型舞台”。当前主体图为：
+
+```text
+public/models/lihenyan/full.png
+```
+
+PixiJS 负责渲染整图、烟雾、花瓣、水波和青色光点，GSAP 负责点击、打招呼、思考、工作、睡眠等动作过渡。后续拆出头发、伞、飘带、眼睛等图层后，可以在同一套舞台里升级成伪 Live2D。
 
 ## 启动方式
 
@@ -85,11 +78,10 @@ D:\桌面\Desktop-pet\
 
 ## 关键说明
 
-### 图片资源
-- 角色图片放在 `public/character/` 目录下
-- 图片格式优先级：png > webp > gif
-- 构建时 Vite 插件自动复制 `public/character/` 到 `dist/character/`
-- **必须有 idle.png，否则宠物显示不出来**
+### 模型资源
+- 第一阶段主体图放在 `public/models/lihenyan/full.png`
+- 构建时 Vite 会自动复制 `public/` 下的模型资源到 `dist/`
+- 后续分层建模会继续放在 `public/models/lihenyan/` 下
 
 ### 透明窗口
 - 使用 Tauri 透明窗口 + `#00000000` 背景色
@@ -98,7 +90,7 @@ D:\桌面\Desktop-pet\
 
 ### Claude Code 联动
 - Rust 后端用 `sysinfo` 检测 claude/claude-code 进程
-- 检测到 → 触发 `claude-code-status` 事件 → 宠物切换到 working 状态
+- 检测到 → 触发 `claude-code-status` 事件 → 宠物进入 working 行为，动作变安静并出现青色粒子
 - 菜单"启动 Claude" → `start_claude_process` 命令
 
 ### 隐藏控制台窗口
@@ -132,6 +124,8 @@ npm run install:app
 - typescript ^5.8.0
 - @tauri-apps/api ^2.5.0
 - @tauri-apps/cli ^2.5.0（dev）
+- pixi.js ^8
+- gsap ^3
 
 ### Rust（后端）
 - tauri 2 (features = [])
@@ -142,7 +136,7 @@ npm run install:app
 ## 常见问题
 
 **Q: 宠物窗口一片空白？**
-A: 检查 `public/character/` 下是否有 idle.png 等图片文件
+A: 检查 `public/models/lihenyan/full.png` 是否存在，并确认前端构建成功
 
 **Q: 启动后弹出 cmd 窗口？**
 A: 通过桌面快捷方式启动（VBS 静默），不要直接双击 exe

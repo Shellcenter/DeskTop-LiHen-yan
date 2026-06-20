@@ -28,7 +28,7 @@ export default defineConfig({
           copyFileSync(resolve(src, entry.name), resolve(dest, entry.name));
         }
       }
-      console.log("  → 已复制角色资源到 dist/character/");
+      console.log("  → 已准备桌宠静态资源");
     }
   }]
 });
