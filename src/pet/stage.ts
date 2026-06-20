@@ -1,9 +1,10 @@
-import { Application, Assets, Container, Graphics, Sprite, Texture } from 'pixi.js';
+import { Application, Container, Graphics } from 'pixi.js';
 import type { PetAction, PetMood } from './types';
 import { PetAnimator } from './animator';
 import { PetEffects } from './effects';
+import { loadPetModel, type LoadedPetModel } from './model';
 
-const MODEL_URL = '/models/lihenyan/full.png';
+const MODEL_URL = '/models/lihenyan/model.json';
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -13,13 +14,12 @@ export class PetStage {
   private app?: Application;
   private root = new Container();
   private character = new Container();
-  private sprite?: Sprite;
   private shadow = new Graphics();
   private effects = new PetEffects();
   private animator = new PetAnimator();
   private initialized = false;
   private lastNow = performance.now();
-  private texture?: Texture;
+  private model?: LoadedPetModel;
   private currentMood: PetMood = 'idle';
 
   constructor(private readonly host: HTMLElement) {}
@@ -40,7 +40,7 @@ export class PetStage {
     this.host.appendChild(app.canvas);
 
     this.app = app;
-    this.texture = await Assets.load<Texture>(MODEL_URL);
+    this.model = await loadPetModel(MODEL_URL);
     this.buildScene();
     app.ticker.add(() => this.update());
     this.initialized = true;
@@ -82,17 +82,15 @@ export class PetStage {
   }
 
   private buildScene() {
-    if (!this.app || !this.texture) return;
+    if (!this.app || !this.model) return;
     this.root = new Container();
     this.character = new Container();
-    this.sprite = new Sprite(this.texture);
-    this.sprite.anchor.set(0.5, 0.62);
 
     this.shadow = new Graphics()
       .ellipse(0, 0, 62, 9)
       .fill({ color: 0x193d3c, alpha: 0.16 });
 
-    this.character.addChild(this.sprite);
+    this.character.addChild(this.model.container);
     this.root.addChild(this.effects.back);
     this.root.addChild(this.shadow);
     this.root.addChild(this.character);
@@ -102,7 +100,7 @@ export class PetStage {
   }
 
   private update() {
-    if (!this.app || !this.sprite) return;
+    if (!this.app || !this.model) return;
     const now = performance.now();
     const deltaSeconds = Math.min(0.05, (now - this.lastNow) / 1000);
     this.lastNow = now;
@@ -130,18 +128,18 @@ export class PetStage {
   }
 
   private layout() {
-    if (!this.app || !this.sprite || !this.texture) return;
+    if (!this.app || !this.model) return;
     const width = this.app.renderer.width / this.app.renderer.resolution;
     const height = this.app.renderer.height / this.app.renderer.resolution;
-    const textureWidth = this.texture.width || 1024;
-    const textureHeight = this.texture.height || 1024;
+    const textureWidth = this.model.spec.size.width || 1024;
+    const textureHeight = this.model.spec.size.height || 1024;
     const available = Math.min(width, height);
     const target = available * 1.18;
     const scale = Math.min(target / textureWidth, target / textureHeight);
 
     this.root.x = width / 2;
     this.root.y = height * 0.72;
-    this.sprite.scale.set(scale);
+    this.model.container.scale.set(scale);
     this.shadow.y = 72;
   }
 }
