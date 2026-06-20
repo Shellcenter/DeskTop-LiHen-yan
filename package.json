@@ -1,0 +1,27 @@
+{
+  "name": "desktop-pet",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "prepare-assets": "powershell -ExecutionPolicy Bypass -File scripts/prepare-assets.ps1",
+    "remove-bg": "python scripts/remove-character-background.py",
+    "tauri": "tauri",
+    "build:app": "tauri build --bundles nsis",
+    "build:exe": "tauri build --no-bundle",
+    "install:app": "powershell -ExecutionPolicy Bypass -File scripts/install-desktop-pet.ps1",
+    "shortcut": "powershell -ExecutionPolicy Bypass -File scripts/create-desktop-shortcut.ps1",
+    "install:shortcut": "npm run install:app"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.5.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.5.0",
+    "typescript": "^5.8.0",
+    "vite": "^6.3.0"
+  }
+}

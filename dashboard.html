@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>离恨烟设置</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body class="dashboard-page">
+    <main class="dashboard-app">
+      <header class="dashboard-header">
+        <span class="cc-indicator offline" id="cc-indicator"></span>
+        <h1 class="dashboard-title">离恨烟设置</h1>
+      </header>
+
+      <section class="dashboard-section">
+        <h2 class="section-title">角色</h2>
+
+        <div class="setting-row">
+          <span class="setting-label">大小</span>
+          <div class="setting-control">
+            <input type="range" id="scale-slider" min="0.4" max="1.8" step="0.05" value="1" />
+            <span id="scale-value" class="setting-value">1.00</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-label">透明度</span>
+          <div class="setting-control">
+            <input type="range" id="opacity-slider" min="0.2" max="1.0" step="0.05" value="1" />
+            <span id="opacity-value" class="setting-value">1.00</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-label">窗口置顶</span>
+          <label class="toggle">
+            <input type="checkbox" id="always-on-top" checked />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <span class="setting-label">开机自启</span>
+          <label class="toggle">
+            <input type="checkbox" id="auto-start" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="dashboard-section">
+        <h2 class="section-title">Claude Code</h2>
+        <div class="status-row">
+          <span class="status-label">运行状态</span>
+          <div class="status-right">
+            <span id="cc-status-dot" class="status-dot offline"></span>
+            <span id="cc-status-text" class="status-text">检测中...</span>
+          </div>
+        </div>
+        <button class="dashboard-btn" id="btn-start-claude">启动 Claude Code</button>
+      </section>
+
+      <section class="dashboard-section">
+        <h2 class="section-title">说明</h2>
+        <p class="dashboard-note">拖动人物本体可移动。大小只改变人物，不会放大背景框。角色图片需为透明 PNG，文件名：idle / wave / happy / think / working / sleep / typing。</p>
+      </section>
+    </main>
+
+    <script type="module" src="/src/dashboard-page.ts"></script>
+  </body>
+</html>
