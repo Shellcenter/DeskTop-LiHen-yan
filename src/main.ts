@@ -3,16 +3,15 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import type { PetConfig, PetState } from './state';
+import type { PetState, PetConfig } from './state';
 import {
+  ALL_STATES,
   DEFAULT_CONFIG,
   STATE_MESSAGES,
+  STATE_LABELS,
   StateManager,
   InteractionLog,
 } from './state';
-import { PetBrain } from './pet/brain';
-import { PetStage } from './pet/stage';
-import type { PetAction, PetMood } from './pet/types';
 
 const BASE_PET_WIDTH = 240;
 const WINDOW_PADDING = 16;
@@ -21,7 +20,7 @@ const DRAG_THRESHOLD_PX = 8;
 const appWindow = getCurrentWindow();
 
 const petWrap = document.getElementById('pet-wrap')!;
-const petModelHost = document.getElementById('pet-model-host')!;
+const petImage = document.getElementById('pet-image') as HTMLImageElement;
 const bubble = document.getElementById('bubble')!;
 const bubbleText = document.getElementById('bubble-text')!;
 const menu = document.getElementById('menu')!;
@@ -29,10 +28,10 @@ const menuBackdrop = document.getElementById('menu-backdrop')!;
 const appRoot = document.getElementById('app-root')!;
 
 const stateManager = new StateManager();
-const petBrain = new PetBrain();
-const petStage = new PetStage(petModelHost);
 const interactionLog = new InteractionLog();
 let config: PetConfig = { ...DEFAULT_CONFIG };
+let characterAssets = new Map<PetState, string>();
+let cycleIndex = 0;
 let menuBusy = false;
 let layoutReady = false;
 let menuSlotHeight = 260;
@@ -48,7 +47,7 @@ async function boot() {
     config = { ...DEFAULT_CONFIG };
   }
 
-  await petStage.init();
+  characterAssets = await probeCharacterAssets();
   bindInteractions();
 
   try {
@@ -59,14 +58,17 @@ async function boot() {
 
   listen<boolean>('claude-code-status', (event) => {
     config.claude_code_detected = event.payload;
-    applyBrainDecision(petBrain.setClaudeRunning(event.payload));
-    if (!event.payload) interactionLog.add('Claude Code 已停止');
+    if (event.payload) {
+      stateManager.setState('working');
+      showBubble('Claude Code 正在工作中~');
+    } else {
+      stateManager.setState('idle');
+      interactionLog.add('Claude Code 已停止');
+    }
   });
 
   stateManager.onChange((newState) => {
-    const mood = toPetMood(newState);
-    petStage.setMood(mood);
-    petStage.play(toPetAction(newState));
+    updatePetImage(newState);
   });
 
   listen<PetConfig>('config-updated', (event) => {
@@ -77,27 +79,44 @@ async function boot() {
 
   applyOpacity(config.opacity);
   applyScale(config.scale);
-  petStage.setMood('idle');
+  updatePetImage('idle');
 
+  await waitForPetImage();
   await measureMenuSlot();
   await syncWindowSize();
   layoutReady = true;
 
-  startBrainLoop();
+  startIdleLoop();
 
   setTimeout(() => {
-    applyBrainDecision(petBrain.interact('wave'));
-    showBubble('离恨烟来啦~');
+    stateManager.setState('wave');
+    const loaded = characterAssets.size;
+    showBubble(
+      loaded >= ALL_STATES.length
+        ? '离恨烟来啦~'
+        : `离恨烟来啦~（已识别 ${loaded}/7 种形态）`,
+    );
   }, 400);
 
   try {
     const found = await invoke<boolean>('is_claude_running_cmd');
     if (found) {
-      applyBrainDecision(petBrain.setClaudeRunning(true));
+      stateManager.setState('working');
+      showBubble('Claude Code 正在工作中~');
     }
   } catch {
     /* ignore */
   }
+}
+
+function waitForPetImage(): Promise<void> {
+  if (petImage.complete && petImage.naturalWidth > 0) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    petImage.addEventListener('load', () => resolve(), { once: true });
+    petImage.addEventListener('error', () => resolve(), { once: true });
+  });
 }
 
 async function measureMenuSlot() {
@@ -118,15 +137,66 @@ async function measureMenuSlot() {
   );
 }
 
-function startBrainLoop() {
+function assetExists(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = url;
+  });
+}
+
+async function probeCharacterAssets(): Promise<Map<PetState, string>> {
+  const map = new Map<PetState, string>();
+  const results = await Promise.all(
+    ALL_STATES.map(async (state) => {
+      const urls = [
+        `/character/${state}.png`,
+        `/character/${state}.webp`,
+        `/character/${state}.gif`,
+      ];
+      for (const url of urls) {
+        if (await assetExists(url)) return { state, url };
+      }
+      return { state, url: '' };
+    }),
+  );
+  for (const { state, url } of results) {
+    if (url) map.set(state, url);
+  }
+  return map;
+}
+
+function startIdleLoop() {
   const scheduleNext = () => {
-    const delay = 1600;
+    const delay = 12000 + Math.random() * 8000;
     window.setTimeout(() => {
-      applyBrainDecision(petBrain.tick());
+      if (stateManager.currentState === 'idle' && characterAssets.size > 1) {
+        const idleStates = ALL_STATES.filter(
+          (s) => s !== 'idle' && characterAssets.has(s),
+        );
+        if (idleStates.length > 0) {
+          const pick = idleStates[Math.floor(Math.random() * idleStates.length)];
+          stateManager.setState(pick);
+          showBubble(randomMessage(pick));
+        }
+      }
       scheduleNext();
     }, delay);
   };
   scheduleNext();
+}
+
+function updatePetImage(state: PetState) {
+  const src =
+    characterAssets.get(state) ??
+    characterAssets.get('idle') ??
+    '/character/idle.png';
+  petImage.className = `pet-asset state-${state}`;
+  const normalized = src.startsWith('/') ? src : `/${src}`;
+  if (petImage.getAttribute('src') !== normalized) {
+    petImage.setAttribute('src', normalized);
+  }
 }
 
 let bubbleTimer: number | null = null;
@@ -183,30 +253,6 @@ function resetDragState() {
   dragStarted = false;
 }
 
-function applyBrainDecision(decision: ReturnType<PetBrain['tick']>) {
-  if (!decision) return;
-  petStage.setMood(decision.mood);
-  if (decision.action) petStage.play(decision.action);
-  if (decision.message) showBubble(decision.message);
-}
-
-function toPetMood(state: string): PetMood {
-  if (state === 'working' || state === 'typing') return 'working';
-  if (state === 'happy' || state === 'wave') return 'happy';
-  if (state === 'think') return 'think';
-  if (state === 'sleep') return 'sleep';
-  return 'idle';
-}
-
-function toPetAction(state: string): PetAction {
-  if (state === 'wave') return 'wave';
-  if (state === 'happy') return 'tap';
-  if (state === 'think') return 'think';
-  if (state === 'working' || state === 'typing') return 'working';
-  if (state === 'sleep') return 'sleep';
-  return 'idle';
-}
-
 function bindInteractions() {
   menu.addEventListener('mousedown', (e) => e.stopPropagation());
   menu.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -222,15 +268,14 @@ function bindInteractions() {
     hideMenu();
   });
 
-  petModelHost.addEventListener('pointerdown', (e) => {
+  petImage.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     dragPointerId = e.pointerId;
     dragStart = { x: e.clientX, y: e.clientY };
     dragStarted = false;
   });
 
-  petModelHost.addEventListener('pointermove', (e) => {
-    petStage.lookAt(e.clientX, e.clientY);
+  petImage.addEventListener('pointermove', (e) => {
     if (dragPointerId !== e.pointerId || !dragStart || dragStarted) return;
     const dx = e.clientX - dragStart.x;
     const dy = e.clientY - dragStart.y;
@@ -240,11 +285,7 @@ function bindInteractions() {
     }
   });
 
-  petModelHost.addEventListener('pointerleave', () => {
-    petStage.resetLook();
-  });
-
-  petModelHost.addEventListener('pointerup', (e) => {
+  petImage.addEventListener('pointerup', (e) => {
     if (dragPointerId !== e.pointerId) return;
     const wasClick = !dragStarted;
     resetDragState();
@@ -254,30 +295,46 @@ function bindInteractions() {
       hideMenu();
       return;
     }
-    applyBrainDecision(petBrain.interact('tap'));
-    showBubble(randomMessage('happy'));
+    cycleState();
     interactionLog.add('点击了离恨烟');
   });
 
-  petModelHost.addEventListener('pointercancel', resetDragState);
+  petImage.addEventListener('pointercancel', resetDragState);
 
-  petModelHost.addEventListener('dblclick', (e) => {
+  petImage.addEventListener('dblclick', (e) => {
     e.stopPropagation();
     resetDragState();
     hideMenu();
-    applyBrainDecision(petBrain.interact('wave'));
+    stateManager.setState('wave');
     showBubble('嘿嘿~ 别戳我啦！');
   });
 
   document.addEventListener('dragover', (e) => e.preventDefault());
-  document.addEventListener('drop', async (e) => {
-    e.preventDefault();
-    hideMenu();
-    const files = Array.from(e.dataTransfer?.files || []);
-    if (files.length === 0) return;
-    applyBrainDecision(petBrain.interact('think'));
-    showBubble('文件投喂还没接入 Claude Code~');
-    interactionLog.add(`尝试投喂 ${files.length} 个文件`);
+
+  // Tauri 原生拖拽事件（能获取完整文件路径）
+  appWindow.onDragDropEvent(async (event) => {
+    if (event.payload.type === 'over') {
+      petImage.style.opacity = '0.6';
+    }
+    if (event.payload.type === 'leave') {
+      petImage.style.opacity = '1';
+    }
+    if (event.payload.type === 'drop') {
+      hideMenu();
+      petImage.style.opacity = '1';
+      const paths = event.payload.paths;
+      if (paths.length === 0) return;
+      stateManager.setState('working');
+      for (const fullPath of paths) {
+        try {
+          const result = await invoke<string>('open_with_claude', { path: fullPath });
+          showBubble(result);
+          interactionLog.add('投喂: ' + fullPath);
+        } catch (err) {
+          showBubble(String(err));
+        }
+      }
+    }
   });
 
   const openContextMenu = (e: Event) => {
@@ -290,7 +347,7 @@ function bindInteractions() {
     void showMenu();
   };
 
-  petModelHost.addEventListener('contextmenu', (e) => {
+  petImage.addEventListener('contextmenu', (e) => {
     e.stopPropagation();
     openContextMenu(e);
   });
@@ -321,6 +378,19 @@ function bindInteractions() {
       layoutReady = true;
     }
   });
+}
+
+function cycleState() {
+  const available = ALL_STATES.filter((s) => characterAssets.has(s));
+  if (available.length === 0) {
+    showBubble('未找到形态图片，请检查 public/character/ 目录');
+    return;
+  }
+  cycleIndex = (cycleIndex + 1) % available.length;
+  const next = available[cycleIndex];
+  stateManager.setState(next, { holdMs: 12000, force: true });
+  showBubble(STATE_LABELS[next] ?? next);
+  interactionLog.add(`切换形态: ${next}`);
 }
 
 async function runMenuAction(action: string | undefined) {
@@ -364,17 +434,16 @@ async function handleMenuAction(action: string | undefined) {
         await invoke('open_dashboard');
         break;
       case 'cycle-state':
-        applyBrainDecision(petBrain.interact('wave'));
+        cycleState();
         break;
       case 'say-hi':
-        applyBrainDecision(petBrain.interact('wave'));
+        stateManager.setState('wave', { force: true });
         showBubble(randomMessage('wave'));
         break;
       case 'start-claude': {
         const found = await invoke<boolean>('is_claude_running_cmd');
         if (found) {
           showBubble('Claude Code 已经在运行啦~');
-          applyBrainDecision(petBrain.setClaudeRunning(true));
           break;
         }
         await invoke('start_claude_process');
@@ -383,7 +452,6 @@ async function handleMenuAction(action: string | undefined) {
       }
       case 'check-status': {
         const running = await invoke<boolean>('is_claude_running_cmd');
-        applyBrainDecision(petBrain.setClaudeRunning(running));
         showBubble(running ? 'Claude Code 正在工作中！' : 'Claude Code 未运行~');
         break;
       }
@@ -401,13 +469,13 @@ async function handleMenuAction(action: string | undefined) {
 
 function applyOpacity(opacity: number) {
   document.documentElement.style.setProperty('--pet-opacity', String(opacity));
-  petStage.setOpacity(opacity);
 }
 
 async function applyScale(scale: number) {
   const safeScale = Math.min(1.8, Math.max(0.4, scale));
   const width = Math.round(BASE_PET_WIDTH * safeScale);
   document.documentElement.style.setProperty('--pet-width', `${width}px`);
+  await waitForPetImage();
   await measureMenuSlot();
   await syncWindowSize();
 }

@@ -155,7 +155,8 @@ fn is_claude_running_cmd(state: State<AppState>) -> Result<bool, String> {
 #[tauri::command]
 fn start_claude_process() -> Result<(), String> {
     let result = std::process::Command::new("cmd")
-        .args(["/C", "start", "cmd", "/K", "claude"])
+        .args(["/K", "claude"])
+        .current_dir(r"D:\桌面\Desktop-pet")
         .spawn();
     match result {
         Ok(_) => Ok(()),
@@ -173,6 +174,45 @@ fn open_dashboard(app: AppHandle) -> Result<(), String> {
     window.show().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+fn feed_file_to_claude(path: String) -> Result<String, String> {
+    std::process::Command::new("cmd")
+        .args(["/C", "start", "claude", "-p", &format!("请分析这个文件: {}", path)])
+        .current_dir(r"D:\桌面\Desktop-pet")
+        .spawn()
+        .map(|_| format!("已发送 {} 给 Claude Code", path))
+        .map_err(|e| format!("发送文件失败: {}", e))
+}
+
+#[tauri::command]
+fn open_with_claude(path: String) -> Result<String, String> {
+    let p = std::path::Path::new(&path);
+
+    if p.is_dir() {
+        // 是目录 → 在此目录启动 claude
+        std::process::Command::new("cmd")
+            .args(["/K", "claude"])
+            .current_dir(p)
+            .spawn()
+            .map(|_| format!("在 {} 启动了 Claude Code", path))
+            .map_err(|e| format!("启动失败: {}", e))
+    } else if p.is_file() {
+        // 是文件 → 在所在目录启动 claude 并分析该文件
+        let parent = p.parent().unwrap_or(std::path::Path::new(r"D:\桌面\Desktop-pet"));
+        let file_name = p.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("未知文件");
+        std::process::Command::new("cmd")
+            .args(["/K", "claude", "-p", &format!("请帮我分析 {} 这个文件", file_name)])
+            .current_dir(parent)
+            .spawn()
+            .map(|_| format!("已打开 {} 并启动 Claude Code", file_name))
+            .map_err(|e| format!("启动失败: {}", e))
+    } else {
+        Err(format!("路径不存在: {}", path))
+    }
 }
 
 // ─── 工具函数 ───
@@ -233,6 +273,8 @@ pub fn run() {
             is_claude_running_cmd,
             start_claude_process,
             open_dashboard,
+            feed_file_to_claude,
+            open_with_claude,
         ])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
