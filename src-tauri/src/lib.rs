@@ -154,8 +154,9 @@ fn is_claude_running_cmd(state: State<AppState>) -> Result<bool, String> {
 
 #[tauri::command]
 fn start_claude_process() -> Result<(), String> {
+    // 用 start 命令启动，不保留 cmd 黑窗口
     let result = std::process::Command::new("cmd")
-        .args(["/K", "claude"])
+        .args(["/C", "start", "", "cmd", "/K", "claude"])
         .current_dir(r"D:\桌面\Desktop-pet")
         .spawn();
     match result {
@@ -191,21 +192,19 @@ fn open_with_claude(path: String) -> Result<String, String> {
     let p = std::path::Path::new(&path);
 
     if p.is_dir() {
-        // 是目录 → 在此目录启动 claude
         std::process::Command::new("cmd")
-            .args(["/K", "claude"])
+            .args(["/C", "start", "", "cmd", "/K", "claude"])
             .current_dir(p)
             .spawn()
             .map(|_| format!("在 {} 启动了 Claude Code", path))
             .map_err(|e| format!("启动失败: {}", e))
     } else if p.is_file() {
-        // 是文件 → 在所在目录启动 claude 并分析该文件
         let parent = p.parent().unwrap_or(std::path::Path::new(r"D:\桌面\Desktop-pet"));
         let file_name = p.file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("未知文件");
         std::process::Command::new("cmd")
-            .args(["/K", "claude", "-p", &format!("请帮我分析 {} 这个文件", file_name)])
+            .args(["/C", "start", "", "cmd", "/K", "claude", "-p", &format!("请帮我分析 {} 这个文件", file_name)])
             .current_dir(parent)
             .spawn()
             .map(|_| format!("已打开 {} 并启动 Claude Code", file_name))
@@ -246,10 +245,14 @@ fn load_config() -> PetConfig {
 fn start_claude_monitor(app: AppHandle) {
     std::thread::spawn(move || {
         let mut system = System::new();
+        let mut last = false;
         loop {
-            let found = is_claude_running(&mut system);
-            let _ = app.emit("claude-code-status", found);
             std::thread::sleep(std::time::Duration::from_secs(3));
+            let found = is_claude_running(&mut system);
+            if found != last {
+                let _ = app.emit("claude-code-status", found);
+                last = found;
+            }
         }
     });
 }

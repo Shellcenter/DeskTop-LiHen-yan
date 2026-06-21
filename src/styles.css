@@ -86,6 +86,7 @@ body {
   background: transparent;
   animation: float 4s ease-in-out infinite;
   transform-origin: center bottom;
+  transition: opacity 0.35s ease;
 }
 
 .pet-asset:active {
@@ -93,11 +94,14 @@ body {
 }
 
 .state-happy { animation: bounce 0.5s ease; }
-.state-wave { animation: wave 0.6s ease; }
+.state-wave { animation: pet-wave 0.6s ease; }
 .state-think { animation: tilt 0.4s ease; }
 .state-typing { animation: type 0.3s ease infinite; }
 .state-working { animation: work 1.5s ease infinite; }
-.state-sleep { filter: brightness(0.7); animation: sleep 3s ease-in-out infinite; }
+.state-sleep {
+  filter: brightness(0.55) saturate(0.6);
+  animation: slumber 4s ease-in-out infinite;
+}
 
 @keyframes float {
   0%, 100% { transform: translateY(0); }
@@ -109,7 +113,7 @@ body {
   50% { transform: scale(0.96); }
   100% { transform: scale(1); }
 }
-@keyframes wave {
+@keyframes pet-wave {
   0% { transform: rotate(0deg); }
   25% { transform: rotate(-6deg); }
   75% { transform: rotate(6deg); }
@@ -128,9 +132,11 @@ body {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
 }
-@keyframes sleep {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-2px); }
+@keyframes slumber {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-3px) rotate(-2deg); }
+  50% { transform: translateY(-1px) rotate(1deg); }
+  75% { transform: translateY(-4px) rotate(-1deg); }
 }
 
 .bubble {
