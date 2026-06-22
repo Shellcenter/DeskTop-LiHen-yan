@@ -318,6 +318,18 @@ pub fn run() {
             exit_app,
         ])
         .setup(|app| {
+            #[cfg(windows)]
+            {
+                // 写入启动日志到临时目录
+                let log_path = std::env::temp_dir().join("desktop_pet_boot.log");
+                let _ = std::fs::write(&log_path, format!(
+                    "boot start: {}\n",
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                ));
+            }
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_shadow(false);
                 let _ = window.set_background_color(Some(Color(0, 0, 0, 0)));
