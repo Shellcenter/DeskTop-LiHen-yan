@@ -45,8 +45,8 @@ pub struct AppState {
 // ─── 检查 claude 进程 ───
 
 fn is_claude_running(system: &mut System) -> bool {
-    system.refresh_processes(ProcessesToUpdate::All, true);
-    // 匹配多种 Claude 进程名变体
+    // 只刷新进程列表，不查 CPU/内存（速度快，不卡顿）
+    system.refresh_processes(ProcessesToUpdate::All, false);
     let names = ["claude", "claude.exe", "claude-code", "claude-code.exe"];
     names.iter().any(|name| {
         system.processes_by_name(OsStr::new(name)).count() > 0
@@ -188,6 +188,12 @@ fn feed_file_to_claude(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn exit_app(app: AppHandle) -> Result<(), String> {
+    app.exit(0);
+    Ok(())
+}
+
+#[tauri::command]
 fn open_with_claude(path: String) -> Result<String, String> {
     let p = std::path::Path::new(&path);
 
@@ -278,6 +284,7 @@ pub fn run() {
             open_dashboard,
             feed_file_to_claude,
             open_with_claude,
+            exit_app,
         ])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {

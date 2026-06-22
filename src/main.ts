@@ -458,7 +458,7 @@ async function handleMenuAction(action: string | undefined) {
       case 'quit':
         stateManager.setState('sleep');
         showBubble('再见啦~', false);
-        setTimeout(() => window.close(), 1200);
+        setTimeout(() => invoke('exit_app'), 1200);
         break;
     }
   } catch (err) {
