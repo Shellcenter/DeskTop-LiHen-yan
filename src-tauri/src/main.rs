@@ -22,21 +22,20 @@ fn main() {
                 });
             }
             Err(_) => {
-                // 锁文件已存在 → 已有实例在运行
-                // 尝试读取 PID 判断进程是否真的活着
-                let stale = std::fs::read_to_string(&lock_path)
+                // 锁文件已存在，检查对应进程是否真的还活着
+                let really_running = std::fs::read_to_string(&lock_path)
                     .ok()
-                    .and_then(|pid| pid.parse::<u32>().ok())
-                    .map(|pid| std::process::Command::new("tasklist")
-                        .args(&["/FI", &format!("PID eq {}", pid), "/NH"])
-                        .output()
-                        .ok()
-                        .map(|o| String::from_utf8_lossy(&o.stdout).contains(&pid.to_string()))
-                        .unwrap_or(false))
-                    .unwrap_or(true);
+                    .and_then(|pid| pid.trim().parse::<u32>().ok())
+                    .is_some_and(|pid| {
+                        std::process::Command::new("tasklist")
+                            .args(&["/FI", &format!("PID eq {}", pid), "/NH"])
+                            .output()
+                            .ok()
+                            .map(|o| String::from_utf8_lossy(&o.stdout).contains(&pid.to_string()))
+                            .unwrap_or(false)
+                    });
 
-                if stale {
-                    // 真的在运行 → 弹提示退出
+                if really_running {
                     let _ = std::process::Command::new("powershell")
                         .args(["-Command",
                             "& {(Add-Type -AssemblyName System.Windows.Forms); [System.Windows.Forms.MessageBox]::Show('离恨烟桌宠已在运行中~','离恨烟桌宠','OK','Information')}"
@@ -44,7 +43,7 @@ fn main() {
                         .spawn();
                     return;
                 }
-                // 锁文件过期（上次异常退出）→ 覆盖后继续启动
+                // 进程已死（上次异常退出）→ 覆盖锁文件后继续启动
                 let _ = std::fs::write(&lock_path, "");
             }
         }

@@ -45,9 +45,9 @@ pub struct AppState {
 // ─── 检查 claude 进程 ───
 
 fn is_claude_running(system: &mut System) -> bool {
-    // 只刷新进程列表，不查 CPU/内存（速度快，不卡顿）
     system.refresh_processes(ProcessesToUpdate::All, false);
-    let names = ["claude", "claude.exe", "claude-code", "claude-code.exe"];
+    // 只匹配 claude-code 进程名，避免把 Claude 桌面版误判为 Claude Code
+    let names = ["claude-code", "claude-code.exe"];
     names.iter().any(|name| {
         system.processes_by_name(OsStr::new(name)).count() > 0
     })

@@ -444,16 +444,10 @@ async function handleMenuAction(action: string | undefined) {
         stateManager.setState('wave', { force: true });
         showBubble(randomMessage('wave'));
         break;
-      case 'start-claude': {
-        const found = await invoke<boolean>('is_claude_running_cmd');
-        if (found) {
-          showBubble('Claude Code 已经在运行啦~');
-          break;
-        }
+      case 'start-claude':
         await invoke('start_claude_process');
         showBubble('正在启动 Claude Code~');
         break;
-      }
       case 'check-status': {
         const running = await invoke<boolean>('is_claude_running_cmd');
         showBubble(running ? 'Claude Code 正在工作中！' : 'Claude Code 未运行~');
