@@ -98,30 +98,31 @@ fn get_auto_start() -> bool {
 // ─── 启动 Claude（优先用 Windows Terminal） ───
 
 fn launch_claude(dir: &std::path::Path, file: Option<&str>) -> Result<(), String> {
-    let mut args = Vec::new();
-    args.push("-d".to_string());
-    args.push(dir.to_string_lossy().to_string());
-    args.push("claude".to_string());
-    if let Some(f) = file {
-        args.push("-p".to_string());
-        args.push(format!("请帮我分析 {} 这个文件", f));
-    }
+    // 通过 cmd /C 启动 claude，确保环境变量 PATH 被正确解析
+    let cmd = if let Some(f) = file {
+        format!("claude -p \"请帮我分析 {} 这个文件\"", f)
+    } else {
+        "claude".to_string()
+    };
 
-    if std::process::Command::new("wt.exe").args(&args).spawn().is_ok() {
+    // 尝试 Windows Terminal（传 cmd /C 以保证找到 claude 命令）
+    if std::process::Command::new("wt.exe")
+        .args(["-d", &dir.to_string_lossy().to_string(), "cmd", "/C", &cmd])
+        .spawn()
+        .is_ok()
+    {
         return Ok(());
     }
-    // 回退到 cmd
-    let mut cmd_args: Vec<&str> = vec!["/C", "start", "", "cmd", "/K", "claude"];
-    if file.is_some() {
-        cmd_args.push("-p");
-    }
-    // Note: 回退模式不支持传递文件分析参数到 cmd
-    std::process::Command::new("cmd")
-        .args(&cmd_args)
+    // 回退到传统 cmd 窗口
+    if std::process::Command::new("cmd")
+        .args(["/C", "start", "", "cmd", "/K", &cmd])
         .current_dir(dir)
         .spawn()
-        .map(|_| ())
-        .map_err(|e| format!("启动失败: {}", e))
+        .is_ok()
+    {
+        return Ok(());
+    }
+    Err("启动 Claude Code 失败".into())
 }
 
 // ─── Tauri Commands ───
