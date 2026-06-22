@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>离恨烟桌宠</title>
     <link rel="stylesheet" href="/src/styles.css" />
+    <script>
+      window.onerror = function(msg, url, line) {
+        try { localStorage.setItem('pet_error', JSON.stringify({msg,url,line,time:Date.now()})) } catch(e) {}
+      }
+    </script>
   </head>
   <body>
     <div id="app-root" class="app-root">
