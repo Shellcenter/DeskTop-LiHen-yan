@@ -311,31 +311,35 @@ function bindInteractions() {
 
   document.addEventListener('dragover', (e) => e.preventDefault());
 
-  // Tauri 原生拖拽事件（能获取完整文件路径）
-  appWindow.onDragDropEvent(async (event) => {
-    if (event.payload.type === 'over') {
-      petImage.style.opacity = '0.6';
-    }
-    if (event.payload.type === 'leave') {
-      petImage.style.opacity = '1';
-    }
-    if (event.payload.type === 'drop') {
-      hideMenu();
-      petImage.style.opacity = '1';
-      const paths = event.payload.paths;
-      if (paths.length === 0) return;
-      stateManager.setState('working');
-      for (const fullPath of paths) {
-        try {
-          const result = await invoke<string>('open_with_claude', { path: fullPath });
-          showBubble(result);
-          interactionLog.add('投喂: ' + fullPath);
-        } catch (err) {
-          showBubble(String(err));
+  // Tauri 原生拖拽事件（获取完整文件路径，需生产环境权限）
+  try {
+    appWindow.onDragDropEvent(async (event) => {
+      if (event.payload.type === 'over') {
+        petImage.style.opacity = '0.6';
+      }
+      if (event.payload.type === 'leave') {
+        petImage.style.opacity = '1';
+      }
+      if (event.payload.type === 'drop') {
+        hideMenu();
+        petImage.style.opacity = '1';
+        const paths = event.payload.paths;
+        if (paths.length === 0) return;
+        stateManager.setState('working');
+        for (const fullPath of paths) {
+          try {
+            const result = await invoke<string>('open_with_claude', { path: fullPath });
+            showBubble(result);
+            interactionLog.add('投喂: ' + fullPath);
+          } catch (err) {
+            showBubble(String(err));
+          }
         }
       }
-    }
-  });
+    });
+  } catch {
+    console.warn('拖拽文件功能不可用（生产环境可能需要额外权限）');
+  }
 
   const openContextMenu = (e: Event) => {
     e.preventDefault();

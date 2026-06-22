@@ -95,6 +95,35 @@ fn get_auto_start() -> bool {
     }
 }
 
+// ─── 启动 Claude（优先用 Windows Terminal） ───
+
+fn launch_claude(dir: &std::path::Path, file: Option<&str>) -> Result<(), String> {
+    let mut args = Vec::new();
+    args.push("-d".to_string());
+    args.push(dir.to_string_lossy().to_string());
+    args.push("claude".to_string());
+    if let Some(f) = file {
+        args.push("-p".to_string());
+        args.push(format!("请帮我分析 {} 这个文件", f));
+    }
+
+    if std::process::Command::new("wt.exe").args(&args).spawn().is_ok() {
+        return Ok(());
+    }
+    // 回退到 cmd
+    let mut cmd_args: Vec<&str> = vec!["/C", "start", "", "cmd", "/K", "claude"];
+    if file.is_some() {
+        cmd_args.push("-p");
+    }
+    // Note: 回退模式不支持传递文件分析参数到 cmd
+    std::process::Command::new("cmd")
+        .args(&cmd_args)
+        .current_dir(dir)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("启动失败: {}", e))
+}
+
 // ─── Tauri Commands ───
 
 #[tauri::command]
@@ -154,14 +183,21 @@ fn is_claude_running_cmd(state: State<AppState>) -> Result<bool, String> {
 
 #[tauri::command]
 fn start_claude_process() -> Result<(), String> {
-    // 用 start 命令启动，不保留 cmd 黑窗口
-    let result = std::process::Command::new("cmd")
-        .args(["/C", "start", "", "cmd", "/K", "claude"])
-        .current_dir(r"D:\桌面\Desktop-pet")
+    // 优先用 Windows Terminal（与系统终端环境一致，共享历史记录）
+    let result = std::process::Command::new("wt.exe")
+        .args(["-d", r"D:\桌面\Desktop-pet", "claude"])
         .spawn();
     match result {
         Ok(_) => Ok(()),
-        Err(e) => Err(format!("启动 Claude Code 失败: {}", e)),
+        Err(_) => {
+            // 没有 Windows Terminal 时回退到 cmd
+            std::process::Command::new("cmd")
+                .args(["/C", "start", "", "cmd", "/K", "claude"])
+                .current_dir(r"D:\桌面\Desktop-pet")
+                .spawn()
+                .map(|_| ())
+                .map_err(|e| format!("启动 Claude Code 失败: {}", e))
+        }
     }
 }
 
@@ -198,10 +234,7 @@ fn open_with_claude(path: String) -> Result<String, String> {
     let p = std::path::Path::new(&path);
 
     if p.is_dir() {
-        std::process::Command::new("cmd")
-            .args(["/C", "start", "", "cmd", "/K", "claude"])
-            .current_dir(p)
-            .spawn()
+        launch_claude(p, None)
             .map(|_| format!("在 {} 启动了 Claude Code", path))
             .map_err(|e| format!("启动失败: {}", e))
     } else if p.is_file() {
@@ -209,10 +242,7 @@ fn open_with_claude(path: String) -> Result<String, String> {
         let file_name = p.file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("未知文件");
-        std::process::Command::new("cmd")
-            .args(["/C", "start", "", "cmd", "/K", "claude", "-p", &format!("请帮我分析 {} 这个文件", file_name)])
-            .current_dir(parent)
-            .spawn()
+        launch_claude(parent, Some(file_name))
             .map(|_| format!("已打开 {} 并启动 Claude Code", file_name))
             .map_err(|e| format!("启动失败: {}", e))
     } else {
